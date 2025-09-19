@@ -12,7 +12,7 @@ TABLAS_MUNICIPALES = {
 }
 
 # Palabras clave a excluir (filtro negativo global)
-FILTRO_EXCLUIR = ["ocupados", "habitante", "consumo", "Censo", "censo", "vacías", "convencionales", "Mediana", "cuartil"]
+FILTRO_EXCLUIR = ["ocupados", "consumo", "Censo", "censo", "vacías", "convencionales", "Mediana", "cuartil"]
 
 # --- FUNCIONES AUXILIARES ---
 def get_series_municipio(tabla_id: str, municipio: str):
@@ -69,4 +69,5 @@ def consulta_municipio(municipio: str, n_last: int = Query(5, description="Núme
         return {"status": "ok", "municipio": municipio, "n_series": len(datos), "datos": datos}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 

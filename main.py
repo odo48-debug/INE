@@ -36,20 +36,23 @@ def normalizar(texto: str) -> str:
 
 def coincide_municipio(nombre_serie: str, municipio: str) -> bool:
     """
-    Devuelve True si el nombre de la serie corresponde al municipio buscado.
-    Evita falsos positivos como 'Humanes de Madrid' o 'Rivas-Vaciamadrid'.
+    Coincidencia estricta: el nombre de la serie debe comenzar con el municipio exacto.
+    Evita falsos positivos como 'Humanes de Madrid' al buscar 'Madrid'.
     """
     nombre = normalizar(nombre_serie)
     muni = normalizar(municipio)
 
-    patrones = [
-        rf"^{muni}\b",             # empieza con el nombre exacto
-        rf"\b{muni}\b",            # aparece como palabra completa
-        rf"\b{muni}\s*\(",         # seguido de paréntesis
-        rf"\({muni}\)",            # entre paréntesis
-        rf"{muni}\s*$",            # termina con el nombre
-    ]
-    return any(re.search(p, nombre) for p in patrones)
+    # Limpiamos puntuación inicial o final
+    nombre = re.sub(r"[^a-z0-9áéíóúüñ\s-]", " ", nombre)
+    muni = re.sub(r"[^a-z0-9áéíóúüñ\s-]", " ", muni)
+
+    # Reemplazamos múltiples espacios
+    nombre = re.sub(r"\s+", " ", nombre).strip()
+    muni = re.sub(r"\s+", " ", muni).strip()
+
+    # Comprobamos si el nombre comienza con el municipio buscado
+    return nombre.startswith(muni + " ") or nombre == muni
+
 
 # --- FUNCIONES ASÍNCRONAS ---
 async def get_json_async(url: str, timeout: int = 15):
@@ -148,3 +151,4 @@ async def consulta_municipio(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+

@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Query
 import httpx
 import asyncio
+import time
 
-app = FastAPI(title="API INE Municipios", version="2.0")
+app = FastAPI(title="API INE Municipios", version="3.0")
 
 # --- CONFIGURACIÓN ---
 TABLAS_MUNICIPALES = {
@@ -17,18 +18,21 @@ FILTRO_EXCLUIR = [
     "convencionales", "Mediana", "cuartil"
 ]
 
+CACHE_TTL = 3600  # 1 hora
+cache = {}  # memoria local: {municipio: (timestamp, data)}
+
 # --- FUNCIONES ASÍNCRONAS ---
 async def get_json_async(url: str, timeout: int = 15):
-    """Devuelve JSON desde una URL, manejando errores y timeouts."""
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    """Devuelve JSON desde una URL, siguiendo redirecciones."""
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         resp = await client.get(url)
         resp.raise_for_status()
         data = resp.json()
-        return data if isinstance(data, list) or isinstance(data, dict) else []
+        return data if isinstance(data, (list, dict)) else []
 
 async def get_series_municipio(tabla_id: str, municipio: str):
     """Obtiene todas las series de un municipio dentro de una tabla."""
-    url = f"https://servicios.ine.es/wstempus/js/ES/SERIES_TABLA/{tabla_id}"
+    url = f"https://servicios.ine.es/wstempus/jsCache/ES/SERIES_TABLA/{tabla_id}"
     data = await get_json_async(url)
     if not isinstance(data, list):
         return []
@@ -45,12 +49,19 @@ def filtrar_series(series, excluir=None):
 
 async def get_datos_serie(codigo: str, n_last: int = 5):
     """Obtiene los últimos valores de una serie concreta."""
-    url = f"https://servicios.ine.es/wstempus/js/ES/DATOS_SERIE/{codigo}?nult={n_last}"
+    url = f"https://servicios.ine.es/wstempus/jsCache/ES/DATOS_SERIE/{codigo}?nult={n_last}"
     data = await get_json_async(url)
     return data if data else []
 
 async def get_datos_municipio(municipio: str, n_last: int = 5):
     """Consulta en paralelo todas las tablas del INE para un municipio."""
+    # --- Comprobar caché ---
+    now = time.time()
+    if municipio in cache:
+        timestamp, data = cache[municipio]
+        if now - timestamp < CACHE_TTL:
+            return data  # devolver desde caché
+
     resultados = {}
     tareas = []
 
@@ -66,17 +77,23 @@ async def get_datos_municipio(municipio: str, n_last: int = 5):
             continue
 
         series_filtradas = filtrar_series(series, FILTRO_EXCLUIR)
-        for s in series_filtradas:
+        datos_tabla = {}
+
+        for s in series_filtradas[:3]:  # límite 3 por tabla (para no exceder timeout)
             cod = s.get("COD")
             nombre = s.get("Nombre")
             if not cod or not nombre:
                 continue
             try:
                 datos = await get_datos_serie(cod, n_last=n_last)
-                resultados[f"{nombre_indicador} - {nombre}"] = datos
+                datos_tabla[nombre] = datos
             except Exception as e:
-                resultados[f"{nombre_indicador} - {nombre}"] = {"error": str(e)}
+                datos_tabla[nombre] = {"error": str(e)}
 
+        resultados[nombre_indicador] = datos_tabla
+
+    # Guardar en caché
+    cache[municipio] = (now, resultados)
     return resultados
 
 # --- ENDPOINTS ---
@@ -85,7 +102,10 @@ def root():
     return {"message": "API INE Municipios en funcionamiento 🚀"}
 
 @app.get("/municipio/{municipio}")
-async def consulta_municipio(municipio: str, n_last: int = Query(5, description="Número de últimos valores a obtener")):
+async def consulta_municipio(
+    municipio: str,
+    n_last: int = Query(5, description="Número de últimos valores a obtener")
+):
     try:
         datos = await get_datos_municipio(municipio, n_last=n_last)
         if not datos:

@@ -2,8 +2,10 @@ from fastapi import FastAPI, Query
 import httpx
 import asyncio
 import time
+import re
+import unicodedata
 
-app = FastAPI(title="API INE Municipios", version="3.0")
+app = FastAPI(title="API INE Municipios", version="3.1")
 
 # --- CONFIGURACIÓN ---
 TABLAS_MUNICIPALES = {
@@ -21,6 +23,34 @@ FILTRO_EXCLUIR = [
 CACHE_TTL = 3600  # 1 hora
 cache = {}  # memoria local: {municipio: (timestamp, data)}
 
+# --- NORMALIZACIÓN Y FILTRO PRECISO ---
+def normalizar(texto: str) -> str:
+    """Convierte texto a minúsculas, sin acentos ni tildes."""
+    if not texto:
+        return ""
+    texto = texto.lower().strip()
+    return "".join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
+    )
+
+def coincide_municipio(nombre_serie: str, municipio: str) -> bool:
+    """
+    Devuelve True si el nombre de la serie corresponde al municipio buscado.
+    Evita falsos positivos como 'Humanes de Madrid' o 'Rivas-Vaciamadrid'.
+    """
+    nombre = normalizar(nombre_serie)
+    muni = normalizar(municipio)
+
+    patrones = [
+        rf"^{muni}\b",             # empieza con el nombre exacto
+        rf"\b{muni}\b",            # aparece como palabra completa
+        rf"\b{muni}\s*\(",         # seguido de paréntesis
+        rf"\({muni}\)",            # entre paréntesis
+        rf"{muni}\s*$",            # termina con el nombre
+    ]
+    return any(re.search(p, nombre) for p in patrones)
+
 # --- FUNCIONES ASÍNCRONAS ---
 async def get_json_async(url: str, timeout: int = 15):
     """Devuelve JSON desde una URL, siguiendo redirecciones."""
@@ -36,7 +66,7 @@ async def get_series_municipio(tabla_id: str, municipio: str):
     data = await get_json_async(url)
     if not isinstance(data, list):
         return []
-    return [s for s in data if municipio.lower() in s.get("Nombre", "").lower()]
+    return [s for s in data if coincide_municipio(s.get("Nombre", ""), municipio)]
 
 def filtrar_series(series, excluir=None):
     """Excluye series por palabras clave negativas."""

@@ -11,11 +11,10 @@ app = FastAPI(title="API INE Municipios", version="3.1")
 TABLAS_MUNICIPALES = {
     "poblacion_municipio": "29005",
     "indicadores_urbanos": "69303",
+    "indicadores_urbanos_2": "69336",
     "hogares_vivienda": "69302",
     "superficie_uso_suelo": "69305",
-    "renta_media": "69306",
-    "empresas": "69307",
-    "educacion": "69309"
+    "distribucion_renta": "30904"
 }
 
 FILTRO_EXCLUIR = [
@@ -154,5 +153,6 @@ async def consulta_municipio(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 

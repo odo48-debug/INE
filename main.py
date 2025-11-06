@@ -10,6 +10,7 @@ app = FastAPI(title="API INE Municipios", version="3.1")
 # --- CONFIGURACIÓN ---
 TABLAS_MUNICIPALES = {
     "poblacion_municipio": "29005",
+    "viviendas_por_municipio": "3456",
     "indicadores_urbanos": "69303",
     "indicadores_urbanos_2": "69336",
     "hogares_vivienda": "69302",
@@ -153,6 +154,7 @@ async def consulta_municipio(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 
 

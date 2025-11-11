@@ -83,7 +83,7 @@ def filtrar_series(series, excluir=None):
         if not any(p.lower() in s.get("Nombre", "").lower() for p in excluir)
     ]
 
-async def get_datos_serie(codigo: str, n_last: int = 5):
+async def get_datos_serie(codigo: str, n_last: int = 3):
     """Obtiene los últimos valores de una serie concreta."""
     url = f"https://servicios.ine.es/wstempus/jsCache/ES/DATOS_SERIE/{codigo}?nult={n_last}"
     data = await get_json_async(url)
@@ -154,6 +154,7 @@ async def consulta_municipio(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 
 

@@ -89,7 +89,7 @@ async def get_datos_serie(codigo: str, n_last: int = 5):
     data = await get_json_async(url)
     return data if data else []
 
-async def get_datos_municipio(municipio: str, n_last: int = 5):
+async def get_datos_municipio(municipio: str, n_last: int = 3):
     """Consulta en paralelo todas las tablas del INE para un municipio."""
     # --- Comprobar caché ---
     now = time.time()
@@ -140,7 +140,7 @@ def root():
 @app.get("/municipio/{municipio}")
 async def consulta_municipio(
     municipio: str,
-    n_last: int = Query(5, description="Número de últimos valores a obtener")
+    n_last: int = Query(3, description="Número de últimos valores a obtener")
 ):
     try:
         datos = await get_datos_municipio(municipio, n_last=n_last)
@@ -154,6 +154,7 @@ async def consulta_municipio(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 
 
